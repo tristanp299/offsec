@@ -1,0 +1,11 @@
+- site:
+- filetype:
+- ext:
+	- ext:php, ext:xml, ext:py
+- -filetype:
+	- excludes
+	- site: blah -filetype:html
+- intitle:"index of" "parent directory"
+
+- Google Hacking Database
+	- exploit db

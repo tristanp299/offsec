@@ -1,0 +1,134 @@
+# Passive 
+
+- [[Google hacking]]
+-  Netcraft
+- Github
+	- owner:megacorpone path:users
+	- Large repo toolsitleaks
+		- Gitrob and Gitleaks
+			- mostly requires access token
+- Shodan
+	- hostname:megacorpone.com
+- Security Headers
+- SSL Server Test
+
+# Active
+- [[DNS]]
+	- hostname 
+		- -h
+		- -t (txt/mx)
+			- get text records
+	- DNSRecon
+		- dnsrecon -d megacorpone.com -t std
+		- -t brt
+			- brt = brute force, std = standard
+		- -D list
+	- DNSEnum
+		- dnsenum megacorpone.com
+	- [[Windows]]
+		- nslookup mail.megacorptwo.com
+		- nslookup -type=TXT info.megacorptwo.com $ip
+
+- [[Netcat]]
+	- nc -nvv -w 1 -z $ip 3388-3390
+		- -w = timeout
+		- -z =  zero-I/O
+			- scan, dont send data
+		- -u = udp
+- [[iptables]]
+	1. sudo iptables -I INPUT 1 -s $ip -j ACCEPT
+	2. sudo iptables -I OUTPUT 1 -d $ip -j ACCEPT
+	3. sudo iptables -Z
+		- -I --> new rules
+		- -s --> source IP
+		- -d --> destination IP
+		- -j --> accept traffice
+		- -Z --> zero the packet and byte counters
+	4. nmap $ip
+	5. sudo iptables -vn -L
+		- -v --> verbosity
+		- -n --> numeric count
+		- -L --> list the rules present
+	6. sudo iptables -Z
+- [[nmap]]
+	- nmap -p 80 $ip-253
+		- can add the -# to an IP for a range
+	- --oscan-guess
+	- --script-help
+- [[Powershell]]
+	- Test-NetConnection -Port 445 [$ip]
+	- 1..1024 | % {echo ((New-Object Net.Sockets.TcpClient).Connect("192.168.50.151", $_)) "TCP port $_ is open"} 2>$null
+- http-title nmap script scan
+	- useful info
+- [[SMB]]
+	- [windows]
+		- net view \\\\dc01 /all
+		- smbclinet -L //server -U user
+			- -L = lists of share names
+			- -U for users
+		- smbclient -L //server -U user%password
+			- username & password
+		- smbclient //server/share -U user%password
+			- connecting to share
+		- cd tgt_dir
+		- lcd /myLocalDir
+		- smbclient //server/share --directory path/to/directory -c 'get file.txt'
+		- put [filename] ??
+		- leading SMB to the Win2K or NT server
+			- smbclient //server/plans -I [$ip] -W [domain_name]  -U username%password
+		- --no-pass
+- [[NetBIOS]]
+	- sudo nbtscan -r [$ip]
+- [[SMTP]]
+	- VRFY
+		- verify email
+		- Example:
+			- VRFY root
+			- VRFY idontexist
+		- [[SMPT_VRFY_script]]
+	- EXPN
+		- membership of a mailing list
+	- [Windows]
+		- Test-NetConnection -Port 25 [$ip] 
+		- Optional
+			- install telnet
+				- dism /online /Enable-Feature/FeatureName:TelnetClient
+			- OR transfer it from another client
+			- telnet [$ip]
+- [[SNMP]]
+	- Example: [Must be UDP scan]
+		- sudo nmap -sU --open -p 161
+	- onesixtyone
+		- tool used for brute forcing SNMP port
+		- build community strings
+			- echo public > community
+			- echo private >> community
+			- echo manager >> comunity
+		- build ip list
+			- for ip in $(seq 1 254); do echo 192.169.50.\$ip;done > ips
+		- onesixtyone -c community -i ips
+	- snmpwalk
+		- look up MIB for values
+		- used for probing and querying SNMP values
+			- Must know the SNMP read-only community string
+				- usually "public"
+		- snmpwalk -c public -v1 -t 10
+			- -c --> community string
+			- -v --> SNMP version
+			- -t --> timeout
+		- snmpwalk -c public -v1 192.168.50.151 1.3.6.1.4.1.77.1.2.25
+			- for windows dc01 user accounts
+		- snmpwalk -c public -v1 192.168.50.151 1.3.6.1.2.1.25.4.2.1.2
+			- for running processes
+		- snmpwalk -c public -v1 192.168.50.151 1.3.6.1.2.1.25.6.3.1.2
+			- all installed software
+		- snmpwalk -c public -v1 192.168.50.151 1.3.6.1.2.1.6.13.1.3
+			- all TCP listening ports
+		- snmpwalk -Oa
+			- automatically converts hex into ASCII
+- Nessus
+- [[Nmap]]
+	- sudo nmap -sV -p 443 --script "vuln" [$ip]
+	- sudo nmap --script-updatedb
+		- after downloading script
+	- sudo nmap -sV -p 443 --script "http-vuln-cve2021-41773" 192.168.50.124

